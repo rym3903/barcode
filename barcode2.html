@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>バーコード生成ツール</title>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.0/dist/JsBarcode.all.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 50px;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        #barcode {
+            margin: 20px;
+        }
+        input {
+            padding: 10px;
+            width: 300px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            transition: border 0.3s ease;
+        }
+        input:focus {
+            border-color: #007BFF;
+            outline: none;
+        }
+        button {
+            padding: 5px 10px;
+            font-size: 14px;
+            margin: 5px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .barcode-list {
+            text-align: left;
+            margin-top: 30px;
+        }
+        .barcode-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            cursor: move; /* ドラッグ可能 */
+        }
+        svg {
+            margin-right: 10px;
+        }
+        .design-1 {
+            background: white;
+            color: black;
+        }
+        .design-2 {
+            background: #333;
+            color: white;
+        }
+        .design-select {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 200;
+            padding: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>バーコード生成ツール</h1>
+    <input type="text" id="barcodeData" placeholder="バーコードデータを入力">
+    <br>
+    <button onclick="generateBarcode()">バーコード生成</button>
+    <button onclick="addToStock()">ストックに追加</button>
+
+    <select class="design-select" onchange="changeDesign(this.value)">
+        <option value="1">デザイン1</option>
+        <option value="2">デザイン2</option>
+    </select>
+
+    <br><br>
+    <svg id="barcode"></svg>
+
+    <h2>ストックされたバーコード</h2>
+    <div id="barcodeStock" class="barcode-list"></div>
+
+    <script>
+        let stock = [];
+
+        // ページロード時にlocalStorageからストックとデザインを読み込み
+        window.onload = function() {
+            const savedStock = localStorage.getItem('barcodeStock');
+            const savedDesign = localStorage.getItem('selectedDesign');
+
+            if (savedStock) {
+                stock = JSON.parse(savedStock);
+                renderStock();
+            }
+
+            if (savedDesign) {
+                changeDesign(savedDesign);
+                document.querySelector('.design-select').value = savedDesign;
+            }
+        }
+
+        function generateBarcode() {
+            const data = document.getElementById('barcodeData').value;
+            if (data) {
+                JsBarcode("#barcode", data, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 66,
+                    displayValue: true
+                });
+            } else {
+                alert("バーコードデータを入力してください。");
+            }
+        }
+
+        function addToStock() {
+            const data = document.getElementById('barcodeData').value;
+            if (data && !stock.includes(data)) {
+                stock.push(data);
+                saveToLocalStorage();
+                renderStock();
+            } else if (stock.includes(data)) {
+                alert("このバーコードは既にストックされています。");
+            } else {
+                alert("ストックに追加するデータを入力してください。");
+            }
+        }
+
+        function renderStock() {
+            const stockDiv = document.getElementById('barcodeStock');
+            stockDiv.innerHTML = ''; // クリアして再描画
+
+            stock.forEach((barcodeData, index) => {
+                const barcodeItem = document.createElement('div');
+                barcodeItem.classList.add('barcode-item');
+                barcodeItem.draggable = true; // ドラッグ可能にする
+                barcodeItem.innerHTML = `
+                    <svg id="stock-barcode-${index}"></svg>
+                    <button onclick="removeFromStock(${index})">削除</button>
+                `;
+
+                barcodeItem.addEventListener('dragstart', function (e) {
+                    e.dataTransfer.setData('text/plain', index);
+                });
+
+                barcodeItem.addEventListener('dragover', function (e) {
+                    e.preventDefault();
+                });
+
+                barcodeItem.addEventListener('drop', function (e) {
+                    e.preventDefault();
+                    const draggedIndex = e.dataTransfer.getData('text/plain');
+                    reorderStock(draggedIndex, index);
+                });
+
+                stockDiv.appendChild(barcodeItem);
+                JsBarcode(`#stock-barcode-${index}`, barcodeData, {
+                    format: "CODE128",
+                    width: 2,
+                    height: 66,
+                    displayValue: true
+                });
+            });
+        }
+
+        function removeFromStock(index) {
+            stock.splice(index, 1);
+            saveToLocalStorage();
+            renderStock();
+        }
+
+        function reorderStock(draggedIndex, dropIndex) {
+            const draggedItem = stock.splice(draggedIndex, 1)[0];
+            stock.splice(dropIndex, 0, draggedItem);
+            saveToLocalStorage();
+            renderStock();
+        }
+
+        function saveToLocalStorage() {
+            localStorage.setItem('barcodeStock', JSON.stringify(stock));
+        }
+
+        function changeDesign(designNumber) {
+            document.body.className = '';
+            switch (designNumber) {
+                case '1':
+                    document.body.classList.add('design-1');
+                    break;
+                case '2':
+                    document.body.classList.add('design-2');
+                    break;
+                default:
+                    break;
+            }
+            localStorage.setItem('selectedDesign', designNumber); // デザインをlocalStorageに保存
+        }
+    </script>
+
+</body>
+</html>
