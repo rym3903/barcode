@@ -236,16 +236,22 @@ function handleFileSelect(event) {
         const reader = new FileReader();
         reader.onload = function(e) {
             const importedData = JSON.parse(e.target.result);
+            
+            // インポートした設定をstockとselectedDesignに反映
             stock = importedData.stock || [];
-            localStorage.setItem('selectedDesign', importedData.selectedDesign || '1');
+            const selectedDesign = importedData.selectedDesign || '1';
+            
+            // ローカルストレージに新しい設定を保存
+            localStorage.setItem('barcodeStock', JSON.stringify(stock));
+            localStorage.setItem('selectedDesign', selectedDesign);
+
+            // 新しい設定を適用
             renderStock();
-            changeDesign(importedData.selectedDesign || '1');
+            changeDesign(selectedDesign);
         };
         reader.readAsText(file);
     }
 }
-
-    </script>
 
 </body>
 </html>
